@@ -9,7 +9,7 @@ const moods: { id: Mood; name: string; caption: string; icon: typeof Sun }[] = [
   { id: 'night', name: 'Moonlight', caption: 'A world after dark', icon: Moon },
 ]
 
-const defaultSettings = { current: 1.8, light: 0.7, population: 9 }
+const defaultSettings = { current: 0.5, light: 0.7, population: 9 }
 
 export default function App() {
   const [ready, setReady] = useState(false)

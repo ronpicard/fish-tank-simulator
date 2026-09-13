@@ -36,6 +36,7 @@ class Reef {
   particles: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial> | null = null
   aspect = 1
   time = 0
+  surfaceTime = 0
   mood = 0
   frame = 0
   previous = 0
@@ -86,7 +87,7 @@ class Reef {
     this.background = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
       vertexShader, fragmentShader: reefFragment,
       uniforms: {
-        uTexture: { value: reef }, uTime: { value: 0 }, uMood: { value: 0 }, uLight: { value: 1 },
+        uTexture: { value: reef }, uTime: { value: 0 }, uSurfaceTime: { value: 0 }, uMood: { value: 0 }, uLight: { value: 1 },
       }, depthWrite: false,
     }))
     this.background.position.z = -5
@@ -188,11 +189,14 @@ class Reef {
     const activeFish = this.swimmers.slice(0, population)
     if (!paused) {
       this.time += dt * current
+      // Surface crests keep their pace even with a gentle underwater current.
+      this.surfaceTime += dt
       stepSchool(activeFish, dt, this.time, current)
       stepBottomLife(this.bottomLife, dt, current)
     }
     if (this.background) {
       this.background.material.uniforms.uTime.value = this.time
+      this.background.material.uniforms.uSurfaceTime.value = this.surfaceTime
       this.background.material.uniforms.uMood.value = this.mood
       this.background.material.uniforms.uLight.value = light
     }

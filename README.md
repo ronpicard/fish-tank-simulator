@@ -38,7 +38,7 @@ The workflow follows the [official Vite GitHub Pages deployment guide](https://v
 - Choose daylight, golden hour, or moonlight from the lighting menu.
 - Text and controls start hidden. Use the faint eye icon or **H** to reveal them.
 - Sound is enabled by default: soft pump vibration, filtered circulation, and irregular small bubbles. Autoplay is attempted immediately. If the browser blocks it, the first click/tap or ordinary keypress starts it. **M** mutes or unmutes. A mute choice is respected by subsequent clicks.
-- Adjust current, ambient light, and fish population with the sliders. Defaults are lively current (1.8×), 70% ambient light, and nine fish; Reset restores these values.
+- Adjust current, ambient light, and fish population with the sliders. Defaults are gentle current (0.5×), 70% ambient light, and nine fish; Reset restores these values. Surface crests move at a faster, steady pace independent of the current slider and stop when the reef is paused.
 - Pause the reef, go fullscreen, or hide the controls for an uninterrupted view.
 - Keyboard: **Space** pauses, **M** toggles sound, **F** toggles fullscreen, **H** hides/shows controls, **Escape** closes a panel or restores controls.
 

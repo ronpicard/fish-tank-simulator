@@ -19,6 +19,7 @@ const tankLighting = /* glsl */ `
 export const reefFragment = /* glsl */ `
   uniform sampler2D uTexture;
   uniform float uTime;
+  uniform float uSurfaceTime;
   uniform float uMood;
   uniform float uLight;
   varying vec2 vUv;
@@ -30,7 +31,7 @@ export const reefFragment = /* glsl */ `
     float coral = (1.0 - smoothstep(0.28, 0.59, uv.y)) * water;
     float surface = exp(-pow((uv.y - 0.846) * 115.0, 2.0));
     uv.x += sin(uv.y * 30.0 + uTime * 0.8) * coral * 0.00075;
-    uv.y += sin(uv.x * 76.0 - uTime * 1.1) * surface * 0.0015;
+    uv.y += sin(uv.x * 76.0 - uSurfaceTime * 4.0) * surface * 0.0015;
     vec3 color = texture2D(uTexture, uv).rgb;
     vec3 inside = tankLight(color, uMood, uLight);
     float caustic = pow(max(0.0, sin(uv.x * 81.0 + sin(uv.y * 44.0 + uTime * 0.35) * 1.7)), 12.0);
