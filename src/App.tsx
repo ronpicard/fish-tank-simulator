@@ -9,13 +9,15 @@ const moods: { id: Mood; name: string; caption: string; icon: typeof Sun }[] = [
   { id: 'night', name: 'Moonlight', caption: 'A world after dark', icon: Moon },
 ]
 
+const defaultSettings = { current: 1.8, light: 0.7, population: 9 }
+
 export default function App() {
   const [ready, setReady] = useState(false)
   const [paused, setPaused] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [mood, setMood] = useState<Mood>('day')
-  const [current, setCurrent] = useState(0.8)
-  const [population, setPopulation] = useState(7)
-  const [light, setLight] = useState(1)
+  const [current, setCurrent] = useState(defaultSettings.current)
+  const [population, setPopulation] = useState(defaultSettings.population)
+  const [light, setLight] = useState(defaultSettings.light)
   const [sound, setSound] = useState(true)
   const [audioStatus, setAudioStatus] = useState<AudioStatus>('waiting')
   const [hidden, setHidden] = useState(true)
@@ -151,7 +153,7 @@ export default function App() {
           <input id="light" type="range" min="0.65" max="1.3" step="0.05" value={light} onChange={event => setLight(Number(event.target.value))} />
           <label className="slider-label" htmlFor="population">Reef fish <span>{population}</span></label>
           <input id="population" type="range" min="3" max="9" step="1" value={population} onChange={event => setPopulation(Number(event.target.value))} />
-          <div className="settings-footer"><span>One fish of each species.</span><button onClick={() => { setCurrent(0.8); setLight(1); setPopulation(7) }}>Reset</button></div>
+          <div className="settings-footer"><span>One fish of each species.</span><button onClick={() => { setCurrent(defaultSettings.current); setLight(defaultSettings.light); setPopulation(defaultSettings.population) }}>Reset</button></div>
         </section>}
         <nav className="toolbar" aria-label="Aquarium controls">
           <button className={`tool-button lighting-button ${panel === 'light' ? 'active' : ''}`} onClick={() => setPanel(value => value === 'light' ? null : 'light')} aria-expanded={panel === 'light'} aria-label={`Lighting: ${activeMood.name}`} data-panel="light">

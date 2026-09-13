@@ -1,31 +1,35 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { createFishModel, createCreatureModel, type AnimalModel } from './animalModels'
 import { createSchool, createBottomLife, seededRandom, stepSchool, stepBottomLife, type Swimmer } from './simulation'
-import { vertexShader, reefFragment, foregroundFragment, fishVertex, fishFragment, creatureVertex, particleVertex, particleFragment } from './shaders'
+import { vertexShader, reefFragment, foregroundFragment, particleVertex, particleFragment } from './shaders'
 
 export type Mood = 'day' | 'dusk' | 'night'
 export interface AquariumOptions { paused: boolean; mood: Mood; current: number; population: number; light: number }
 interface Props { options: AquariumOptions; onReady: () => void }
 const assets = `${import.meta.env.BASE_URL}assets/`
-// Pixel bounds preserve the cardinal's long fins and exclude neighboring atlas animals.
-const fishRects = [
-  [8, 125, 414, 385], [424, 14, 833, 437], [841, 142, 1253, 390],
-  [8, 432, 415, 793], [424, 526, 833, 767], [834, 530, 1253, 780],
-  [8, 902, 417, 1178], [424, 897, 830, 1189], [835, 924, 1250, 1170],
-]
-const creatureRects = [[0, 18, 674, 680], [707, 275, 1241, 600], [17, 714, 625, 1198], [679, 731, 1238, 1167]]
-const uvRect = (rect: number[]) => new THREE.Vector4(rect[0] / 1254, 1 - rect[3] / 1254, (rect[2] - rect[0]) / 1254, (rect[3] - rect[1]) / 1254)
-const rectAspect = (rect: number[]) => (rect[3] - rect[1]) / (rect[2] - rect[0])
 
 class Reef {
   renderer: THREE.WebGLRenderer
   scene = new THREE.Scene()
-  camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 30)
+  camera = new THREE.PerspectiveCamera(30, 1, 0.1, 30)
   options: AquariumOptions
   swimmers: Swimmer[] = createSchool(9)
   bottomLife = createBottomLife()
-  fish: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[] = []
-  creatures: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[] = []
+  fish: AnimalModel[] = []
+  creatures: AnimalModel[] = []
+  contactShadows: THREE.Mesh[] = []
+  environment: THREE.WebGLRenderTarget | null = null
+  keyLight = new THREE.DirectionalLight(0xe5f1ff, 2.1)
+  fillLight = new THREE.DirectionalLight(0x8ccce4, 0.85)
+  rimLight = new THREE.DirectionalLight(0xa5e3ec, 1.6)
+  ambient = new THREE.HemisphereLight(0xe3eff0, 0x35302a, 1.1)
+  heading = new THREE.Vector3()
+  side = new THREE.Vector3()
+  up = new THREE.Vector3()
+  basis = new THREE.Matrix4()
+  targetRotation = new THREE.Quaternion()
   textures: THREE.Texture[] = []
   background: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null = null
   foreground: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null = null
@@ -46,11 +50,22 @@ class Reef {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
     this.renderer.setClearColor(0x100f0f)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 0.96
     this.renderer.domElement.setAttribute('aria-label', 'A small glass aquarium at home with distinct tropical fish, a cleaner shrimp, a snail, a hermit crab, and a starfish')
     this.renderer.domElement.setAttribute('role', 'img')
     this.renderer.domElement.addEventListener('webglcontextlost', this.contextLost)
     container.appendChild(this.renderer.domElement)
-    this.camera.position.z = 10
+    this.camera.position.z = 5.5
+    this.keyLight.position.set(-1.4, 4.0, 3.0)
+    this.fillLight.position.set(3.0, 0.8, 4.0)
+    this.rimLight.position.set(1.0, 2.5, -2.0)
+    this.scene.add(this.keyLight, this.fillLight, this.rimLight, this.ambient)
+    const environment = new RoomEnvironment()
+    const generator = new THREE.PMREMGenerator(this.renderer)
+    this.environment = generator.fromScene(environment, 0.05)
+    this.scene.environment = this.environment.texture
+    environment.dispose(); generator.dispose()
     this.observer = new ResizeObserver(this.resize)
     this.observer.observe(container)
     document.addEventListener('visibilitychange', this.visibility)
@@ -66,9 +81,7 @@ class Reef {
       else this.textures.push(texture)
       return texture
     }
-    const [reef, atlas, invertebrates] = await Promise.all([
-      loadTexture('home-tank.png'), loadTexture('home-fish.png'), loadTexture('home-creatures.png'),
-    ])
+    const reef = await loadTexture('home-tank.png')
     if (this.disposed) return
     this.background = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
       vertexShader, fragmentShader: reefFragment,
@@ -78,48 +91,38 @@ class Reef {
     }))
     this.background.position.z = -5
     this.background.renderOrder = -10
-    this.background.scale.x = this.aspect
+    this.background.scale.set(this.aspect * this.viewHalfHeight(-5), this.viewHalfHeight(-5), 1)
     this.scene.add(this.background)
 
     this.swimmers.forEach(swimmer => {
-      const rect = fishRects[swimmer.species]
-      const geometry = new THREE.PlaneGeometry(1, rectAspect(rect), 28, 16)
-      const material = new THREE.ShaderMaterial({
-        vertexShader: fishVertex, fragmentShader: fishFragment,
-        uniforms: {
-          uTexture: { value: atlas }, uTime: { value: 0 }, uPhase: { value: swimmer.phase }, uActivity: { value: 0.5 },
-          uUvRect: { value: uvRect(rect) },
-          uDepth: { value: swimmer.depth }, uMood: { value: 0 }, uLight: { value: 1 },
-        }, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-      })
-      const mesh = new THREE.Mesh(geometry, material)
-      mesh.renderOrder = 3 + Math.round((1 - swimmer.depth) * 10)
-      this.fish.push(mesh)
-      this.scene.add(mesh)
+      const model = createFishModel(swimmer.species)
+      model.root.rotation.y = swimmer.vx > 0 ? -0.28 : Math.PI + 0.28
+      this.fish.push(model)
+      this.scene.add(model.root)
     })
 
     this.foreground = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
       vertexShader, fragmentShader: foregroundFragment,
       uniforms: { uTexture: { value: reef }, uMood: { value: 0 }, uLight: { value: 1 } },
-      transparent: true, depthWrite: false,
+      transparent: true, depthWrite: false, depthTest: false,
     }))
-    this.foreground.scale.x = this.aspect
+    this.foreground.scale.set(this.aspect * this.viewHalfHeight(0), this.viewHalfHeight(0), 1)
     this.foreground.renderOrder = 5
     this.scene.add(this.foreground)
 
     for (let i = 0; i < 4; i++) {
-      const rect = creatureRects[i]
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, rectAspect(rect), 18, 18), new THREE.ShaderMaterial({
-        vertexShader: creatureVertex, fragmentShader: fishFragment,
-        uniforms: {
-          uTexture: { value: invertebrates }, uTime: { value: 0 }, uKind: { value: i },
-          uUvRect: { value: uvRect(rect) }, uDepth: { value: 0.2 }, uMood: { value: 0 }, uLight: { value: 1 },
-        },
-        transparent: true, depthWrite: false,
+      const model = createCreatureModel(i)
+      model.setOrder(16)
+      this.creatures.push(model)
+      this.scene.add(model.root)
+      const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader: 'varying vec2 vUv; void main() { float r = length((vUv - 0.5) * 2.0); gl_FragColor = vec4(0.06, 0.045, 0.03, (1.0 - smoothstep(0.05, 1.0, r)) * 0.24); }',
+        transparent: true, depthWrite: false, depthTest: false,
       }))
-      mesh.renderOrder = 16
-      this.creatures.push(mesh)
-      this.scene.add(mesh)
+      shadow.renderOrder = 15
+      this.contactShadows.push(shadow)
+      this.scene.add(shadow)
     }
     const random = seededRandom(123)
     const positions = [], sizes = [], phases = []
@@ -137,23 +140,27 @@ class Reef {
       uniforms: { uTime: { value: 0 }, uPixelRatio: { value: this.renderer.getPixelRatio() }, uAspect: { value: this.aspect } },
       transparent: true, depthWrite: false,
     }))
+    this.particles.scale.setScalar(this.viewHalfHeight(0))
     this.particles.frustumCulled = false
     this.particles.renderOrder = 20
     this.scene.add(this.particles)
     this.animate(performance.now())
   }
 
+  viewHalfHeight(z: number) {
+    return Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * (this.camera.position.z - z)
+  }
+
   resize = () => {
     const { width, height } = this.container.getBoundingClientRect()
     this.aspect = Math.max(width, 1) / Math.max(height, 1)
-    this.camera.left = -this.aspect
-    this.camera.right = this.aspect
+    this.camera.aspect = this.aspect
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(width, height)
     if (this.background) {
-      this.background.scale.x = this.aspect
+      this.background.scale.set(this.aspect * this.viewHalfHeight(-5), this.viewHalfHeight(-5), 1)
     }
-    if (this.foreground) this.foreground.scale.x = this.aspect
+    if (this.foreground) this.foreground.scale.set(this.aspect * this.viewHalfHeight(0), this.viewHalfHeight(0), 1)
     if (this.particles) this.particles.material.uniforms.uAspect.value = this.aspect
   }
 
@@ -193,33 +200,50 @@ class Reef {
       this.foreground.material.uniforms.uMood.value = this.mood
       this.foreground.material.uniforms.uLight.value = light
     }
-    this.fish.forEach((mesh, i) => {
+    const night = Math.max(0, this.mood - 1)
+    this.keyLight.intensity = light * (1.45 - this.mood * 0.30)
+    this.fillLight.intensity = light * (0.30 - night * 0.12)
+    this.rimLight.intensity = light * (0.75 - night * 0.30)
+    this.ambient.intensity = light * (0.42 - night * 0.18)
+    this.keyLight.color.set(this.mood > 1 ? 0x91b9f5 : this.mood > 0.4 ? 0xffd4b8 : 0xe5f1ff)
+    this.fish.forEach((model, i) => {
+      const mesh = model.root
       mesh.visible = i < population
       if (!mesh.visible) return
       const swimmer = this.swimmers[i]
-      const size = swimmer.size * (1 - swimmer.depth * 0.22)
-      mesh.position.set((swimmer.x * 2 - 1) * this.aspect, 1 - swimmer.y * 2, 1 - swimmer.depth)
-      // A smooth narrowing body suggests yaw as the individual turns around.
-      const facing = Math.sign(swimmer.facing || 1) * (0.16 + Math.abs(swimmer.facing) * 0.84)
-      mesh.scale.set(size * facing, size, 1)
-      mesh.rotation.z = THREE.MathUtils.clamp(-swimmer.vy * Math.sign(swimmer.vx) * 6, -0.22, 0.22)
-      mesh.renderOrder = swimmer.depth > 0.56 ? 3 : 8 + Math.round((1 - swimmer.depth) * 5)
-      mesh.material.uniforms.uTime.value = swimmer.finTime
-      mesh.material.uniforms.uActivity.value = swimmer.activity
-      mesh.material.uniforms.uDepth.value = swimmer.depth
-      mesh.material.uniforms.uMood.value = this.mood
-      mesh.material.uniforms.uLight.value = light
+      const z = 0.8 - swimmer.depth * 0.95
+      const halfHeight = this.viewHalfHeight(z)
+      mesh.position.set((swimmer.x * 2 - 1) * this.aspect * halfHeight, (1 - swimmer.y * 2) * halfHeight, z)
+      mesh.scale.setScalar(swimmer.size * 1.28 * this.viewHalfHeight(0))
+      // A quaternion turns the whole solid animal, including its far eye and paired fins.
+      this.heading.set(swimmer.vx * this.aspect * 2, -swimmer.vy * 2, (swimmer.depth - swimmer.targetDepth) * 0.152)
+      if (!paused && this.heading.lengthSq() > 0.000002) {
+        const horizontal = Math.hypot(this.heading.x, this.heading.z)
+        this.heading.y = THREE.MathUtils.clamp(this.heading.y, -horizontal * 0.42, horizontal * 0.42)
+        this.heading.normalize()
+        this.side.crossVectors(this.heading, THREE.Object3D.DEFAULT_UP).normalize()
+        this.up.crossVectors(this.side, this.heading).normalize()
+        this.basis.makeBasis(this.heading, this.up, this.side)
+        this.targetRotation.setFromRotationMatrix(this.basis)
+        mesh.quaternion.slerp(this.targetRotation, 1 - Math.exp(-3.1 * dt))
+      }
+      model.setOrder(swimmer.depth > 0.56 ? 3 : 8 + Math.round((1 - swimmer.depth) * 5))
+      model.animate(swimmer.finTime, swimmer.activity)
     })
-    this.creatures.forEach((mesh, i) => {
+    this.creatures.forEach((model, i) => {
       const animal = this.bottomLife[i]
       const { x, y } = animal
-      const size = [0.205, 0.083, 0.115, 0.118][i]
-      mesh.position.set((x * 2 - 1) * this.aspect, 1 - y * 2, 1.2)
-      mesh.scale.setScalar(size)
-      mesh.rotation.z = i === 0 ? Math.sin(animal.localTime * 0.035) * 0.04 : 0
-      mesh.material.uniforms.uTime.value = animal.localTime
-      mesh.material.uniforms.uMood.value = this.mood
-      mesh.material.uniforms.uLight.value = light
+      const z = 1.0, halfHeight = this.viewHalfHeight(z)
+      // Shell-bearing animals need slightly more enlargement than the long-antenna shrimp.
+      const size = [0.265, 0.18, 0.205, 0.18][i] * this.viewHalfHeight(0)
+      model.root.position.set((x * 2 - 1) * this.aspect * halfHeight, (1 - y * 2) * halfHeight, z)
+      model.root.scale.setScalar(size)
+      const shadow = this.contactShadows[i]
+      shadow.position.copy(model.root.position)
+      shadow.position.y -= size * [0.19, 0.16, 0.29, 0.24][i]
+      shadow.position.z -= 0.01
+      shadow.scale.set(size * [0.65, 0.65, 0.65, 0.75][i], size * 0.11, 1)
+      model.animate(animal.localTime, animal.speed > 0.0001 ? 1 : 0.10)
     })
     if (this.particles) this.particles.material.uniforms.uTime.value = this.time
     this.renderer.render(this.scene, this.camera)
@@ -234,13 +258,17 @@ class Reef {
     document.removeEventListener('visibilitychange', this.visibility)
     this.renderer.domElement.removeEventListener('webglcontextlost', this.contextLost)
     const geometries = new Set<THREE.BufferGeometry>()
+    const materials = new Set<THREE.Material>()
     this.scene.traverse(object => {
-      if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
+      if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
         geometries.add(object.geometry)
-        object.material.dispose()
+        const list = Array.isArray(object.material) ? object.material : [object.material]
+        list.forEach(material => materials.add(material))
       }
     })
     geometries.forEach(geometry => geometry.dispose())
+    materials.forEach(material => material.dispose())
+    this.environment?.dispose()
     this.textures.forEach(texture => texture.dispose())
     this.scene.clear()
     this.renderer.dispose()

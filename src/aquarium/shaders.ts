@@ -59,59 +59,6 @@ export const foregroundFragment = /* glsl */ `
   }
 `
 
-export const fishVertex = /* glsl */ `
-  uniform float uTime;
-  uniform float uPhase;
-  uniform float uActivity;
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    vec3 p = position;
-    float tail = pow(1.0 - uv.x, 3.5);
-    float beat = sin(uTime + uv.x * 8.0 + uPhase);
-    p.y += beat * tail * (0.011 + uActivity * 0.020);
-    p.x += cos(uTime + uv.x * 7.0 + uPhase) * tail * 0.013;
-    p.y += sin(uTime * 1.7 + uv.x * 13.0) * abs(uv.y - 0.5) * 0.006;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-  }
-`
-
-export const fishFragment = /* glsl */ `
-  uniform sampler2D uTexture;
-  uniform vec4 uUvRect;
-  uniform float uDepth;
-  uniform float uMood;
-  uniform float uLight;
-  varying vec2 vUv;
-  ${tankLighting}
-  void main() {
-    vec4 texel = texture2D(uTexture, uUvRect.xy + vUv * uUvRect.zw);
-    if (texel.a < 0.04) discard;
-    vec3 color = texel.rgb * vec3(0.86, 0.91, 0.94);
-    color = mix(color, vec3(0.025, 0.075, 0.09), uDepth * 0.18);
-    color *= 0.90 + vUv.y * 0.12;
-    gl_FragColor = vec4(tankLight(color, uMood, uLight), texel.a);
-  }
-`
-
-export const creatureVertex = /* glsl */ `
-  uniform float uTime;
-  uniform float uKind;
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    vec3 p = position;
-    if (uKind < 0.5) {
-      float antenna = smoothstep(0.42, 0.90, uv.y);
-      p.x += sin(uTime * 1.25 + uv.y * 10.0) * antenna * 0.012;
-      p.y += sin(uTime * 5.0 + uv.x * 30.0) * (1.0 - smoothstep(0.25, 0.53, uv.y)) * 0.004;
-    } else if (uKind > 1.5 && uKind < 2.5) {
-      p.y += sin(uTime * 4.7 + uv.x * 21.0) * (1.0 - smoothstep(0.25, 0.55, uv.y)) * 0.003;
-    }
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-  }
-`
-
 export const particleVertex = /* glsl */ `
   uniform float uTime;
   uniform float uPixelRatio;
