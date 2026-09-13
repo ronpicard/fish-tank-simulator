@@ -154,6 +154,7 @@ export default function App() {
           <label className="slider-label" htmlFor="population">Reef fish <span>{population}</span></label>
           <input id="population" type="range" min="3" max="9" step="1" value={population} onChange={event => setPopulation(Number(event.target.value))} />
           <div className="settings-footer"><span>One fish of each species.</span><button onClick={() => { setCurrent(defaultSettings.current); setLight(defaultSettings.light); setPopulation(defaultSettings.population) }}>Reset</button></div>
+          <p className="sound-credit">Aquarium recording by <a href="https://freesound.org/people/DudeAwesome/sounds/386023/" target="_blank" rel="noreferrer">DudeAwesome</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><br />Edited for a soft, continuous loop.</p>
         </section>}
         <nav className="toolbar" aria-label="Aquarium controls">
           <button className={`tool-button lighting-button ${panel === 'light' ? 'active' : ''}`} onClick={() => setPanel(value => value === 'light' ? null : 'light')} aria-expanded={panel === 'light'} aria-label={`Lighting: ${activeMood.name}`} data-panel="light">

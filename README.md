@@ -37,7 +37,7 @@ The workflow follows the [official Vite GitHub Pages deployment guide](https://v
 
 - Choose daylight, golden hour, or moonlight from the lighting menu.
 - Text and controls start hidden. Use the faint eye icon or **H** to reveal them.
-- Sound is enabled by default: soft pump vibration, filtered circulation, and irregular small bubbles. Autoplay is attempted immediately. If the browser blocks it, the first click/tap or ordinary keypress starts it. **M** mutes or unmutes. A mute choice is respected by subsequent clicks.
+- Sound is enabled by default: a softly mixed, seamless loop of a real aquarium filter, recorded by [DudeAwesome](https://freesound.org/people/DudeAwesome/sounds/386023/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). Autoplay is attempted immediately. If the browser blocks it, the first click/tap or ordinary keypress starts it. **M** mutes or unmutes. A mute choice is respected by subsequent clicks. The recording is bundled with the app; playback needs no connection to Freesound. Credits are also available in Settings.
 - Adjust current, ambient light, and fish population with the sliders. Defaults are gentle current (0.5×), 70% ambient light, and nine fish; Reset restores these values. Surface crests move at a faster, steady pace independent of the current slider and stop when the reef is paused.
 - Pause the reef, go fullscreen, or hide the controls for an uninterrupted view.
 - Keyboard: **Space** pauses, **M** toggles sound, **F** toggles fullscreen, **H** hides/shows controls, **Escape** closes a panel or restores controls.
@@ -57,3 +57,7 @@ Fish independently alternate between hovering, exploring, inspecting, and short 
 The simulation uses elapsed time and small integration steps, with capped frame deltas. Tests cover long-running bounds and numerical stability, independent activities and speeds, unique species, bottom-dweller movement, pause, frame-rate independence, delayed frames, positive mesh volume, and finite geometry through 3D turns. Pixel ratio is capped for mobile devices.
 
 Original artwork was created with built-in image generation. Assets and exact generation prompts are in `public/assets/`; their provenance is documented in `ASSETS.md`.
+
+## License
+
+Project code is licensed under the [MIT License](LICENSE), copyright © 2026 Ron Picard. Third-party dependencies and assets retain their own licenses; the aquarium recording is licensed under CC BY 4.0. See [ASSETS.md](ASSETS.md) for attribution and asset license details.
