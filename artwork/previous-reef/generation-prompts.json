@@ -1,0 +1,20 @@
+{
+  "mode": "built-in image_gen; exactly 3 calls, one parallel batch, no retries",
+  "assets": [
+    {
+      "asset": "reef-background",
+      "path": "reef.png",
+      "prompt": "Use case: photorealistic-natural.\nAsset type: 16:9 2048x1152 raster background for an animated aquarium React visualizer.\nPrimary request: Photorealistic underwater coral reef background, viewed horizontally into a public aquarium, very dark navy at far top, electric turquoise sunlight shafts from top right, crystal clear blue central open water (middle 60% across and top 65% mostly empty for moving fish), lush sculptural pink lavender branching soft corals/teal sea fans at far left edge and lower corners, rich orange and pale cream corals and anemones at bottom right, fine rippled pale sand in a gently winding channel in lower center, distant misty coral rocks. Natural cinematic photographic realism, jewel tones, peaceful but stunning detailed luminous underwater scene.\nConstraints: No fish, no jellyfish, no creatures, no people, no UI, no words, no glass frame. Exactly one image."
+    },
+    {
+      "asset": "fish-atlas",
+      "path": "fish-atlas.png",
+      "prompt": "Use case: photorealistic-natural.\nAsset type: Transparent RGBA square sprite atlas 2048x2048, for aquarium animation.\nPrimary request: Exact 2x2 grid of four fish, EACH creature isolated fully inside its equal square quadrant with wide clear transparent margins. Top left photoreal adult orange/white/black clownfish side profile facing RIGHT; top right photoreal electric royal blue tang with black marking and yellow tail side profile facing RIGHT; bottom left photoreal golden yellow tang side profile facing RIGHT; bottom right photoreal purple-front yellow-tail royal gramma side profile facing RIGHT. Each fish at same relative centered position within its quadrant, each about 75% cell width, detailed scales and delicate translucent fins, realistic biological proportions.\nConstraints: Genuine transparent RGBA background with preserved alpha, no grid, no labels, no shadow underneath, absolutely transparent background. No border. Exactly one image."
+    },
+    {
+      "asset": "moon-jellyfish",
+      "path": "jellyfish.png",
+      "prompt": "Use case: photorealistic-natural.\nAsset type: Transparent RGBA tall image 1024x1536 for aquarium animation.\nPrimary request: One photoreal translucent moon jellyfish, pearlescent blue/violet bell at upper quarter and graceful fine tendrils trailing below, whole isolated jellyfish centered fully inside image with wide transparent margin, side/front view, soft cyan bioluminescent edge light, realistic fine detail.\nConstraints: Genuine transparent RGBA background with preserved alpha, no background, no words, no other creatures. Exactly one image."
+    }
+  ]
+}
