@@ -27,6 +27,8 @@ Repository: [ronpicard/fish-tank-simulator](https://github.com/ronpicard/fish-ta
 
 Every push to `main` runs `.github/workflows/deploy.yml`, which installs locked dependencies, runs the simulation tests, builds the app, and publishes `dist` to GitHub Pages. A failed test or build prevents publication. Local commits deploy once pushed to GitHub.
 
+Link previews use Open Graph and large-image Twitter card metadata in `index.html`, with the bundled aquarium artwork as the preview image. The canonical page and image URLs are absolute GitHub Pages URLs; update them if the site moves to another domain or path. Crawlers can read this metadata without running JavaScript.
+
 Pages uses **Settings → Pages → Build and deployment → Source → GitHub Actions**. To redeploy manually, open **Actions → Deploy aquarium to GitHub Pages → Run workflow**. The deployment URL also appears in the completed workflow and in **Settings → Pages**.
 
 The app has no backend, credentials, API calls, or paid services. Vite uses relative asset paths, so the build works at both a domain root and a repository subdirectory without editing the configuration. If your default branch has a different name, update the workflow's `branches` entry.
