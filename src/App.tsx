@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AudioLines, Check, ChevronDown, Eye, EyeOff, Maximize, Minimize, Moon, Pause, Play, SlidersHorizontal, Sun, Sunset, Volume2, Waves, X } from 'lucide-react'
 import Aquarium, { type Mood } from './aquarium/Aquarium'
 import { AquariumAudio, type AudioStatus } from './aquarium/audio'
+import { SPECIES } from './aquarium/simulation'
 
 const moods: { id: Mood; name: string; caption: string; icon: typeof Sun }[] = [
   { id: 'day', name: 'Daylight', caption: 'Sunlit shallows', icon: Sun },
@@ -9,14 +10,14 @@ const moods: { id: Mood; name: string; caption: string; icon: typeof Sun }[] = [
   { id: 'night', name: 'Moonlight', caption: 'A world after dark', icon: Moon },
 ]
 
-const defaultSettings = { current: 0.5, light: 0.7, population: 9 }
+const defaultSettings = { current: 0.5, light: 0.7, population: SPECIES.length }
 
 export default function App() {
   const [ready, setReady] = useState(false)
   const [paused, setPaused] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [mood, setMood] = useState<Mood>('day')
   const [current, setCurrent] = useState(defaultSettings.current)
-  const [population, setPopulation] = useState(defaultSettings.population)
+  const [population, setPopulation] = useState<number>(defaultSettings.population)
   const [light, setLight] = useState(defaultSettings.light)
   const [sound, setSound] = useState(true)
   const [audioStatus, setAudioStatus] = useState<AudioStatus>('waiting')
@@ -151,9 +152,9 @@ export default function App() {
           <input id="current" type="range" min="0.3" max="1.8" step="0.1" value={current} onChange={event => setCurrent(Number(event.target.value))} />
           <label className="slider-label" htmlFor="light">Ambient light <span>{Math.round(light * 100)}%</span></label>
           <input id="light" type="range" min="0.65" max="1.3" step="0.05" value={light} onChange={event => setLight(Number(event.target.value))} />
-          <label className="slider-label" htmlFor="population">Reef fish <span>{population}</span></label>
-          <input id="population" type="range" min="3" max="9" step="1" value={population} onChange={event => setPopulation(Number(event.target.value))} />
-          <div className="settings-footer"><span>One fish of each species.</span><button onClick={() => { setCurrent(defaultSettings.current); setLight(defaultSettings.light); setPopulation(defaultSettings.population) }}>Reset</button></div>
+          <label className="slider-label" htmlFor="population">Swimming animals <span>{population}</span></label>
+          <input id="population" type="range" min="3" max={SPECIES.length} step="1" value={population} onChange={event => setPopulation(Number(event.target.value))} />
+          <div className="settings-footer"><span>One of each species.</span><button onClick={() => { setCurrent(defaultSettings.current); setLight(defaultSettings.light); setPopulation(defaultSettings.population) }}>Reset</button></div>
           <p className="sound-credit">Aquarium recording by <a href="https://freesound.org/people/DudeAwesome/sounds/386023/" target="_blank" rel="noreferrer">DudeAwesome</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a><br />Edited for a soft, continuous loop.</p>
         </section>}
         <nav className="toolbar" aria-label="Aquarium controls">

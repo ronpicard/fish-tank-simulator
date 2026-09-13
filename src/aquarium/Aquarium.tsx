@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { createFishModel, createCreatureModel, type AnimalModel } from './animalModels'
-import { createSchool, createBottomLife, seededRandom, stepSchool, stepBottomLife, type Swimmer } from './simulation'
+import { createSchool, createBottomLife, seededRandom, stepSchool, stepBottomLife, SPECIES, type Swimmer } from './simulation'
+import { BOTTOM_SIZES, FOOT_HEIGHTS, substrateAt } from './bottomLife'
+import { AXES, WORLD, worldPosition } from './tankLayout'
 import { vertexShader, reefFragment, foregroundFragment, particleVertex, particleFragment } from './shaders'
 
 export type Mood = 'day' | 'dusk' | 'night'
@@ -15,7 +17,7 @@ class Reef {
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(30, 1, 0.1, 30)
   options: AquariumOptions
-  swimmers: Swimmer[] = createSchool(9)
+  swimmers: Swimmer[] = createSchool(SPECIES.length)
   bottomLife = createBottomLife()
   fish: AnimalModel[] = []
   creatures: AnimalModel[] = []
@@ -30,6 +32,8 @@ class Reef {
   up = new THREE.Vector3()
   basis = new THREE.Matrix4()
   targetRotation = new THREE.Quaternion()
+  surfaceNormal = new THREE.Vector3()
+  shadowNormal = new THREE.Vector3(0, 0, 1)
   textures: THREE.Texture[] = []
   background: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null = null
   foreground: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null = null
@@ -53,7 +57,8 @@ class Reef {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 0.96
-    this.renderer.domElement.setAttribute('aria-label', 'A small glass aquarium at home with distinct tropical fish, a cleaner shrimp, a snail, a hermit crab, and a starfish')
+    this.scene.fog = new THREE.Fog(0x082939, 4.8, 14)
+    this.renderer.domElement.setAttribute('aria-label', 'A glass aquarium with twelve swimming species including a lionfish, betta, and cuttlefish, a shrimp, snail and hermit crab exploring the reef in depth, and a starfish resting on the sand')
     this.renderer.domElement.setAttribute('role', 'img')
     this.renderer.domElement.addEventListener('webglcontextlost', this.contextLost)
     container.appendChild(this.renderer.domElement)
@@ -94,6 +99,16 @@ class Reef {
     this.background.renderOrder = -10
     this.background.scale.set(this.aspect * this.viewHalfHeight(-5), this.viewHalfHeight(-5), 1)
     this.scene.add(this.background)
+    // The original artwork stays still. A masked copy at reef depth lets the
+    // depth buffer hide distant fish while nearby fish swim across the same rocks.
+    this.foreground = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+      vertexShader, fragmentShader: foregroundFragment,
+      uniforms: { uTexture: { value: reef }, uMood: { value: 0 }, uLight: { value: 1 } },
+      depthTest: true, depthWrite: true,
+    }))
+    this.foreground.position.z = -0.55
+    this.foreground.scale.set(this.aspect * this.viewHalfHeight(-0.55), this.viewHalfHeight(-0.55), 1)
+    this.scene.add(this.foreground)
 
     this.swimmers.forEach(swimmer => {
       const model = createFishModel(swimmer.species)
@@ -102,26 +117,15 @@ class Reef {
       this.scene.add(model.root)
     })
 
-    this.foreground = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
-      vertexShader, fragmentShader: foregroundFragment,
-      uniforms: { uTexture: { value: reef }, uMood: { value: 0 }, uLight: { value: 1 } },
-      transparent: true, depthWrite: false, depthTest: false,
-    }))
-    this.foreground.scale.set(this.aspect * this.viewHalfHeight(0), this.viewHalfHeight(0), 1)
-    this.foreground.renderOrder = 5
-    this.scene.add(this.foreground)
-
     for (let i = 0; i < 4; i++) {
       const model = createCreatureModel(i)
-      model.setOrder(16)
       this.creatures.push(model)
       this.scene.add(model.root)
       const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
         vertexShader,
         fragmentShader: 'varying vec2 vUv; void main() { float r = length((vUv - 0.5) * 2.0); gl_FragColor = vec4(0.06, 0.045, 0.03, (1.0 - smoothstep(0.05, 1.0, r)) * 0.24); }',
-        transparent: true, depthWrite: false, depthTest: false,
+        transparent: true, depthWrite: false,
       }))
-      shadow.renderOrder = 15
       this.contactShadows.push(shadow)
       this.scene.add(shadow)
     }
@@ -161,7 +165,7 @@ class Reef {
     if (this.background) {
       this.background.scale.set(this.aspect * this.viewHalfHeight(-5), this.viewHalfHeight(-5), 1)
     }
-    if (this.foreground) this.foreground.scale.set(this.aspect * this.viewHalfHeight(0), this.viewHalfHeight(0), 1)
+    if (this.foreground) this.foreground.scale.set(this.aspect * this.viewHalfHeight(-0.55), this.viewHalfHeight(-0.55), 1)
     if (this.particles) this.particles.material.uniforms.uAspect.value = this.aspect
   }
 
@@ -205,6 +209,8 @@ class Reef {
       this.foreground.material.uniforms.uLight.value = light
     }
     const night = Math.max(0, this.mood - 1)
+    // Animal reflections dim with the water.
+    this.scene.environmentIntensity = light * (1 - night * 0.82)
     this.keyLight.intensity = light * (1.45 - this.mood * 0.30)
     this.fillLight.intensity = light * (0.30 - night * 0.12)
     this.rimLight.intensity = light * (0.75 - night * 0.30)
@@ -215,39 +221,46 @@ class Reef {
       mesh.visible = i < population
       if (!mesh.visible) return
       const swimmer = this.swimmers[i]
-      const z = 0.8 - swimmer.depth * 0.95
-      const halfHeight = this.viewHalfHeight(z)
-      mesh.position.set((swimmer.x * 2 - 1) * this.aspect * halfHeight, (1 - swimmer.y * 2) * halfHeight, z)
-      mesh.scale.setScalar(swimmer.size * 1.28 * this.viewHalfHeight(0))
+      const point = worldPosition(swimmer.x, swimmer.y, swimmer.depth)
+      mesh.position.set(point.x, point.y, point.z)
+      mesh.scale.setScalar(swimmer.size * 1.28 * WORLD.halfHeight)
       // A quaternion turns the whole solid animal, including its far eye and paired fins.
-      this.heading.set(swimmer.vx * this.aspect * 2, -swimmer.vy * 2, (swimmer.depth - swimmer.targetDepth) * 0.152)
+      this.heading.set(swimmer.vx * AXES.x, -swimmer.vy * AXES.y, -swimmer.vz * AXES.depth)
       if (!paused && this.heading.lengthSq() > 0.000002) {
-        const horizontal = Math.hypot(this.heading.x, this.heading.z)
-        this.heading.y = THREE.MathUtils.clamp(this.heading.y, -horizontal * 0.42, horizontal * 0.42)
         this.heading.normalize()
         this.side.crossVectors(this.heading, THREE.Object3D.DEFAULT_UP).normalize()
+        if (this.side.lengthSq() < 0.0001) this.side.set(0, 0, 1)
         this.up.crossVectors(this.side, this.heading).normalize()
         this.basis.makeBasis(this.heading, this.up, this.side)
         this.targetRotation.setFromRotationMatrix(this.basis)
         mesh.quaternion.slerp(this.targetRotation, 1 - Math.exp(-3.1 * dt))
       }
-      model.setOrder(swimmer.depth > 0.56 ? 3 : 8 + Math.round((1 - swimmer.depth) * 5))
       model.animate(swimmer.finTime, swimmer.activity)
     })
     this.creatures.forEach((model, i) => {
       const animal = this.bottomLife[i]
-      const { x, y } = animal
-      const z = 1.0, halfHeight = this.viewHalfHeight(z)
-      // Shell-bearing animals need slightly more enlargement than the long-antenna shrimp.
-      const size = [0.265, 0.18, 0.205, 0.18][i] * this.viewHalfHeight(0)
-      model.root.position.set((x * 2 - 1) * this.aspect * halfHeight, (1 - y * 2) * halfHeight, z)
+      const size = BOTTOM_SIZES[i] * WORLD.halfHeight
+      const point = worldPosition(animal.x, animal.y, animal.depth)
+      const surface = substrateAt(animal.x, animal.depth)
+      this.surfaceNormal.set(surface.nx, surface.ny, surface.nz)
+      // Project the crawling direction onto the local surface; feet, shells and
+      // the contact shadow follow the same slope and the same world coordinates.
+      this.heading.set(Math.cos(animal.heading), 0, Math.sin(animal.heading))
+      this.heading.addScaledVector(this.surfaceNormal, -this.heading.dot(this.surfaceNormal)).normalize()
+      this.side.crossVectors(this.heading, this.surfaceNormal).normalize()
+      this.basis.makeBasis(this.heading, this.surfaceNormal, this.side)
+      this.targetRotation.setFromRotationMatrix(this.basis)
+      if (!model.root.userData.surfacePlaced) {
+        model.root.quaternion.copy(this.targetRotation)
+        model.root.userData.surfacePlaced = true
+      } else if (!paused) model.root.quaternion.slerp(this.targetRotation, 1 - Math.exp(-4 * dt))
+      model.root.position.set(point.x, surface.y, point.z).addScaledVector(this.surfaceNormal, size * FOOT_HEIGHTS[i])
       model.root.scale.setScalar(size)
       const shadow = this.contactShadows[i]
-      shadow.position.copy(model.root.position)
-      shadow.position.y -= size * [0.19, 0.16, 0.29, 0.24][i]
-      shadow.position.z -= 0.01
-      shadow.scale.set(size * [0.65, 0.65, 0.65, 0.75][i], size * 0.11, 1)
-      model.animate(animal.localTime, animal.speed > 0.0001 ? 1 : 0.10)
+      shadow.position.set(point.x, surface.y, point.z).addScaledVector(this.surfaceNormal, 0.001)
+      shadow.quaternion.setFromUnitVectors(this.shadowNormal, this.surfaceNormal)
+      shadow.scale.set(size * (i === 3 ? 0.9 : 0.75), size * (i === 3 ? 0.9 : 0.42), 1)
+      model.animate(animal.localTime, animal.activity)
     })
     if (this.particles) this.particles.material.uniforms.uTime.value = this.time
     this.renderer.render(this.scene, this.camera)

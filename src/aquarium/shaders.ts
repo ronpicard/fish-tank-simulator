@@ -28,20 +28,17 @@ export const reefFragment = /* glsl */ `
     vec2 uv = vUv;
     float water = smoothstep(0.085, 0.095, uv.x) * (1.0 - smoothstep(0.906, 0.917, uv.x));
     water *= smoothstep(0.19, 0.21, uv.y) * (1.0 - smoothstep(0.834, 0.849, uv.y));
-    float coral = (1.0 - smoothstep(0.28, 0.59, uv.y)) * water;
     float surface = exp(-pow((uv.y - 0.846) * 115.0, 2.0));
-    uv.x += sin(uv.y * 30.0 + uTime * 0.8) * coral * 0.00075;
     uv.y += sin(uv.x * 76.0 - uSurfaceTime * 4.0) * surface * 0.0015;
     vec3 color = texture2D(uTexture, uv).rgb;
     vec3 inside = tankLight(color, uMood, uLight);
-    float caustic = pow(max(0.0, sin(uv.x * 81.0 + sin(uv.y * 44.0 + uTime * 0.35) * 1.7)), 12.0);
-    inside += vec3(0.25, 0.29, 0.25) * caustic * coral * 0.028;
     color = mix(color, inside, water);
     gl_FragColor = vec4(color, 1.0);
   }
 `
 
-// A copy of the photographed coral silhouettes occludes fish swimming farther back.
+// Static photographic silhouettes placed inside the fish's world depth range.
+// Discard water pixels entirely so they never write an invisible wall into depth.
 export const foregroundFragment = /* glsl */ `
   uniform sampler2D uTexture;
   uniform float uMood;
@@ -49,14 +46,12 @@ export const foregroundFragment = /* glsl */ `
   varying vec2 vUv;
   ${tankLighting}
   void main() {
-    vec4 texel = texture2D(uTexture, vUv);
     float y = 1.0 - vUv.y;
-    float left = smoothstep(0.13, 0.16, vUv.x) * (1.0 - smoothstep(0.45, 0.50, vUv.x));
-    float right = smoothstep(0.55, 0.61, vUv.x) * (1.0 - smoothstep(0.85, 0.88, vUv.x));
-    float rock = (left + right) * smoothstep(0.46, 0.61, y) * (1.0 - smoothstep(0.743, 0.763, y));
-    // Water is blue and dark; the rock and coral have appreciable red-channel detail.
-    float detail = smoothstep(0.09, 0.20, texel.r) * smoothstep(0.025, 0.085, texel.r - texel.b * 0.38);
-    gl_FragColor = vec4(tankLight(texel.rgb, uMood, uLight), rock * detail);
+    if (vUv.x < 0.095 || vUv.x > 0.91 || y < 0.425 || y > 0.754) discard;
+    vec3 color = texture2D(uTexture, vUv).rgb;
+    // The clear water is blue; the photographed rocks and corals have warm detail.
+    if (color.r < 0.09 || color.r - color.b * 0.48 < 0.018) discard;
+    gl_FragColor = vec4(tankLight(color, uMood, uLight), 1.0);
   }
 `
 

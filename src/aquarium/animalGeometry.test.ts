@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import * as THREE from 'three'
 import { createBodyGeometry, createShellGeometry, createStarGeometry } from './animalGeometry.ts'
 import { createFishModel, createCreatureModel } from './animalModels.ts'
+import { SPECIES } from './simulation.ts'
 
 function signedVolume(geometry: THREE.BufferGeometry) {
   const position = geometry.getAttribute('position'), index = geometry.getIndex()!
@@ -35,7 +36,7 @@ test('generated surfaces have finite positions and normals', () => {
 })
 
 test('every species retains visible depth when turning toward the glass', () => {
-  const models = [...Array.from({ length: 9 }, (_, i) => createFishModel(i)), ...Array.from({ length: 4 }, (_, i) => createCreatureModel(i))]
+  const models = [...SPECIES.map((_, i) => createFishModel(i)), ...Array.from({ length: 4 }, (_, i) => createCreatureModel(i))]
   const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>()
   for (const model of models) {
     for (const angle of [0, Math.PI / 4, Math.PI / 2, Math.PI]) {
